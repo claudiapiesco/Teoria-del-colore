@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixer RGB 0–100 + Luminanza (sRGB)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; line-height: 1.35; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 980px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; }
+    .row { display: grid; grid-template-columns: 54px 1fr 58px; gap: 10px; align-items: center; margin: 8px 0; }
+    .rowWide { display: grid; grid-template-columns: 260px 1fr 90px; gap: 10px; align-items: center; margin: 8px 0; }
+    .swatches { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 10px; }
+    .swatch { border: 1px solid #ddd; border-radius: 12px; padding: 10px; }
+    .chip { height: 80px; border-radius: 10px; border: 1px solid rgba(0,0,0,.15); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+    .small { font-size: 12px; color: #444; }
+    input[type="range"] { width: 100%; }
+    .footer { max-width: 980px; margin-top: 14px; color: #333; font-size: 13px; }
+    .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; border: 1px solid #ddd; }
+    .kpi { margin-top: 6px; display:flex; flex-wrap:wrap; gap:10px; }
+    .kpi span { border: 1px solid #eee; padding: 4px 8px; border-radius: 999px; }
+    .split { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .muted { color:#555; }
+  </style>
+</head>
+<body>
+  <h1>Mixer RGB (0–100) con <span class="mono">luminanza</span> (sRGB, con correzione gamma)</h1>
+
+  <div class="grid">
+    <div class="card">
+      <div class="pill"><b>Colore 1</b></div>
+      <div class="row"><label for="r1">R</label><input id="r1" type="range" min="0" max="100" value="100"><span id="r1v" class="mono">100</span></div>
+      <div class="row"><label for="g1">G</label><input id="g1" type="range" min="0" max="100" value="0"><span id="g1v" class="mono">0</span></div>
+      <div class="row"><label for="b1">B</label><input id="b1" type="range" min="0" max="100" value="0"><span id="b1v" class="mono">0</span></div>
+      <div class="kpi">
+        <span><b>L1</b> = <span class="mono" id="L1">—</span></span>
+      </div>
+      <div class="small">La luminanza è calcolata come <span class="mono">Y = 0.2126R + 0.7152G + 0.0722B</span> su <i>componenti linearizzate</i> (sRGB).</div>
+    </div>
+
+    <div class="card">
+      <div class="pill"><b>Colore 2</b></div>
+      <div class="row"><label for="r2">R</label><input id="r2" type="range" min="0" max="100" value="0"><span id="r2v" class="mono">0</span></div>
+      <div class="row"><label for="g2">G</label><input id="g2" type="range" min="0" max="100" value="100"><span id="g2v" class="mono">100</span></div>
+      <div class="row"><label for="b2">B</label><input id="b2" type="range" min="0" max="100" value="0"><span id="b2v" class="mono">0</span></div>
+      <div class="kpi">
+        <span><b>L2</b> = <span class="mono" id="L2">—</span></span>
+      </div>
+      <div class="small">Obiettivo: collegare “chiaro/scuro” (luminanza) alle quantità.</div>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:980px; margin-top:18px;">
+    <div class="split">
+      <div>
+        <div class="pill"><b>Mix</b></div>
+        <div class="rowWide">
+          <label for="a">a (quota del colore 1)</label>
+          <input id="a" type="range" min="0" max="1" step="0.01" value="0.50">
+          <span id="av" class="mono">0.50</span>
+        </div>
+        <div class="small muted">Il mix è fatto in <b>luce lineare</b>: <span class="mono">LinMix = a·Lin1 + (1−a)·Lin2</span>, poi riconvertito in sRGB per visualizzare.</div>
+      </div>
+
+      <div>
+        <div class="pill"><b>Target di luminanza</b></div>
+        <div class="rowWide">
+          <label for="Lt">Target (0–100)</label>
+          <input id="Lt" type="range" min="0" max="100" step="1" value="50">
+          <span id="Ltv" class="mono">50</span>
+        </div>
+        <div class="rowWide">
+          <label for="autoA">Auto: scegli a per raggiungere il target</label>
+          <input id="autoA" type="checkbox" style="justify-self:start; transform: scale(1.2);">
+          <span class="mono" id="asol">—</span>
+        </div>
+        <div class="small muted">In auto: risolve <span class="mono">a = (Lt − L2)/(L1 − L2)</span> (clamp 0–1).</div>
+      </div>
+    </div>
+
+    <div class="swatches">
+      <div class="swatch">
+        <div class="chip" id="chip1"></div>
+        <div class="mono" id="c1txt" style="margin-top:8px;"></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" id="chip2"></div>
+        <div class="mono" id="c2txt" style="margin-top:8px;"></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" id="chipm"></div>
+        <div class="mono" id="cmtxt" style="margin-top:8px;"></div>
+        <div class="kpi">
+          <span><b>Lmix</b> = <span class="mono" id="Lm">—</span></span>
+          <span>Δ target = <span class="mono" id="dL">—</span></span>
+        </div>
+        <div class="small" id="status" style="margin-top:6px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <b>Nota:</b> questa “luminanza” è la <i>relative luminance</i> sRGB (Y) riscalata in 0–100. Non è la riflettanza fisica di un pigmento; è un modello adatto per schermi e per ragionare su “chiaro/scuro”.
+  </div>
+
+<script>
+  const ids = ["r1","g1","b1","r2","g2","b2","a","Lt","autoA"];
+  const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+  const setText = (id, v) => document.getElementById(id).textContent = v;
+
+  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+  function clamp100(x){ return Math.max(0, Math.min(100, x)); }
+
+  // sRGB transfer functions
+  function srgbToLinear(u){
+    return (u <= 0.04045) ? (u/12.92) : Math.pow((u + 0.055)/1.055, 2.4);
+  }
+  function linearToSrgb(u){
+    return (u <= 0.0031308) ? (12.92*u) : (1.055*Math.pow(u, 1/2.4) - 0.055);
+  }
+
+  function toLinearPct(p){ return srgbToLinear(clamp01(p/100)); }
+  function toPctFromLinear(l){ return clamp100(Math.round(clamp01(linearToSrgb(l))*100)); }
+
+  function luminanceFromPct(rp,gp,bp){
+    const R = toLinearPct(rp), G = toLinearPct(gp), B = toLinearPct(bp);
+    return 0.2126*R + 0.7152*G + 0.0722*B; // Y in [0,1]
+  }
+
+  function rgbCssFromPct(rp,gp,bp){
+    const r = Math.round((clamp100(rp)/100)*255);
+    const g = Math.round((clamp100(gp)/100)*255);
+    const b = Math.round((clamp100(bp)/100)*255);
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  function update() {
+    const r1 = +el.r1.value, g1 = +el.g1.value, b1 = +el.b1.value;
+    const r2 = +el.r2.value, g2 = +el.g2.value, b2 = +el.b2.value;
+    let a  = +el.a.value;
+    const Lt = +el.Lt.value; // 0–100
+    const auto = el.autoA.checked;
+
+    setText("r1v", r1); setText("g1v", g1); setText("b1v", b1);
+    setText("r2v", r2); setText("g2v", g2); setText("b2v", b2);
+    setText("Ltv", Lt);
+
+    const L1 = luminanceFromPct(r1,g1,b1);
+    const L2 = luminanceFromPct(r2,g2,b2);
+    setText("L1", (L1*100).toFixed(1));
+    setText("L2", (L2*100).toFixed(1));
+
+    if(auto){
+      const t = clamp01(Lt/100);
+      let aSol;
+      if (Math.abs(L1 - L2) < 1e-9) aSol = 0.5;
+      else aSol = (t - L2) / (L1 - L2);
+      aSol = clamp01(aSol);
+      a = aSol;
+      el.a.value = a.toFixed(2);
+      setText("asol", a.toFixed(2));
+    } else {
+      setText("asol", "—");
+    }
+    setText("av", a.toFixed(2));
+
+    // Mix in linear light per channel
+    const R1 = toLinearPct(r1), G1 = toLinearPct(g1), B1 = toLinearPct(b1);
+    const R2 = toLinearPct(r2), G2 = toLinearPct(g2), B2 = toLinearPct(b2);
+
+    const Rm_lin = a*R1 + (1-a)*R2;
+    const Gm_lin = a*G1 + (1-a)*G2;
+    const Bm_lin = a*B1 + (1-a)*B2;
+
+    const rm = toPctFromLinear(Rm_lin);
+    const gm = toPctFromLinear(Gm_lin);
+    const bm = toPctFromLinear(Bm_lin);
+
+    const Lm = 0.2126*Rm_lin + 0.7152*Gm_lin + 0.0722*Bm_lin;
+
+    document.getElementById("chip1").style.background = rgbCssFromPct(r1,g1,b1);
+    document.getElementById("chip2").style.background = rgbCssFromPct(r2,g2,b2);
+    document.getElementById("chipm").style.background = rgbCssFromPct(rm,gm,bm);
+
+    setText("c1txt", `C1 = (${r1}%, ${g1}%, ${b1}%)`);
+    setText("c2txt", `C2 = (${r2}%, ${g2}%, ${b2}%)`);
+    setText("cmtxt", `C  = (${rm}%, ${gm}%, ${bm}%)  [mix in lineare]`);
+
+    setText("Lm", (Lm*100).toFixed(1));
+    const dL = (Lm*100 - Lt);
+    setText("dL", dL.toFixed(1));
+
+    document.getElementById("status").textContent =
+      (Math.abs(dL) <= 1.0) ? "Luminanza vicina al target ✅ (entro ±1)" : "Luminanza lontana dal target";
+  }
+
+  ["input","change"].forEach(ev => {
+    Object.values(el).forEach(e => e.addEventListener(ev, update));
+  });
+  update();
+</script>
+</body>
+</html>

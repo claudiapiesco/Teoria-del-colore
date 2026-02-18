@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mixer RGB 0–100 + Media pesata</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; line-height: 1.35; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; max-width: 980px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; }
+    .row { display: grid; grid-template-columns: 54px 1fr 58px; gap: 10px; align-items: center; margin: 8px 0; }
+    .swatches { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 10px; }
+    .swatch { border: 1px solid #ddd; border-radius: 12px; padding: 10px; }
+    .chip { height: 80px; border-radius: 10px; border: 1px solid rgba(0,0,0,.15); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+    .small { font-size: 12px; color: #444; }
+    input[type="range"] { width: 100%; }
+    .footer { max-width: 980px; margin-top: 14px; color: #333; font-size: 13px; }
+    .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; border: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+  <h1>Mixer RGB (scala 0–100) con media vettoriale pesata</h1>
+
+  <div class="grid">
+    <div class="card">
+      <div class="pill"><b>Colore 1</b></div>
+      <div class="row"><label for="r1">R</label><input id="r1" type="range" min="0" max="100" value="100"><span id="r1v" class="mono">100</span></div>
+      <div class="row"><label for="g1">G</label><input id="g1" type="range" min="0" max="100" value="0"><span id="g1v" class="mono">0</span></div>
+      <div class="row"><label for="b1">B</label><input id="b1" type="range" min="0" max="100" value="0"><span id="b1v" class="mono">0</span></div>
+      <div class="small">Valori in [0,100] (percentuale di intensità del canale).</div>
+    </div>
+
+    <div class="card">
+      <div class="pill"><b>Colore 2</b></div>
+      <div class="row"><label for="r2">R</label><input id="r2" type="range" min="0" max="100" value="0"><span id="r2v" class="mono">0</span></div>
+      <div class="row"><label for="g2">G</label><input id="g2" type="range" min="0" max="100" value="100"><span id="g2v" class="mono">100</span></div>
+      <div class="row"><label for="b2">B</label><input id="b2" type="range" min="0" max="100" value="0"><span id="b2v" class="mono">0</span></div>
+      <div class="small">Valori in [0,100] (percentuale di intensità del canale).</div>
+    </div>
+  </div>
+
+  <div class="card" style="max-width:980px; margin-top:18px;">
+    <div class="pill"><b>Peso</b></div>
+    <div class="row" style="grid-template-columns: 130px 1fr 80px;">
+      <label for="a">a (quota del colore 1)</label>
+      <input id="a" type="range" min="0" max="1" step="0.01" value="0.50">
+      <span id="av" class="mono">0.50</span>
+    </div>
+    <div class="small">
+      Media pesata: <span class="mono">C = a·C1 + (1−a)·C2</span> (componente per componente).<br/>
+      Conversione per la visualizzazione: <span class="mono">0–100 → 0–255</span>.
+    </div>
+
+    <div class="swatches">
+      <div class="swatch">
+        <div class="chip" id="chip1"></div>
+        <div class="mono" id="c1txt" style="margin-top:8px;"></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" id="chip2"></div>
+        <div class="mono" id="c2txt" style="margin-top:8px;"></div>
+      </div>
+      <div class="swatch">
+        <div class="chip" id="chipm"></div>
+        <div class="mono" id="cmtxt" style="margin-top:8px;"></div>
+        <div class="small" id="graytxt" style="margin-top:6px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <b>Nota didattica:</b> Se il colore risultante è “grigio” in RGB, allora <span class="mono">Rm ≈ Gm ≈ Bm</span>.
+    Il controllo qui sotto usa una tolleranza in scala 0–100 (default 1).
+    <div style="margin-top:10px;" class="row">
+      <label for="tol">Tolleranza</label>
+      <input id="tol" type="range" min="0" max="10" step="1" value="1">
+      <span id="tolv" class="mono">1</span>
+    </div>
+  </div>
+
+<script>
+  const ids = ["r1","g1","b1","r2","g2","b2","a","tol"];
+  const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+  const setText = (id, v) => document.getElementById(id).textContent = v;
+
+  function clamp100(x){ return Math.max(0, Math.min(100, x)); }
+  function to255(p){ return Math.round((p/100)*255); }
+  function rgbCssFromPct(r,g,b){ return `rgb(${to255(r)}, ${to255(g)}, ${to255(b)})`; }
+
+  function update() {
+    const r1 = +el.r1.value, g1 = +el.g1.value, b1 = +el.b1.value;
+    const r2 = +el.r2.value, g2 = +el.g2.value, b2 = +el.b2.value;
+    const a  = +el.a.value;
+    const tol = +el.tol.value;
+
+    setText("r1v", r1); setText("g1v", g1); setText("b1v", b1);
+    setText("r2v", r2); setText("g2v", g2); setText("b2v", b2);
+    setText("av", a.toFixed(2));
+    setText("tolv", tol);
+
+    // Media vettoriale pesata in scala 0–100
+    const rm = clamp100(Math.round(a*r1 + (1-a)*r2));
+    const gm = clamp100(Math.round(a*g1 + (1-a)*g2));
+    const bm = clamp100(Math.round(a*b1 + (1-a)*b2));
+
+    document.getElementById("chip1").style.background = rgbCssFromPct(r1,g1,b1);
+    document.getElementById("chip2").style.background = rgbCssFromPct(r2,g2,b2);
+    document.getElementById("chipm").style.background = rgbCssFromPct(rm,gm,bm);
+
+    setText("c1txt", `C1 = (${r1}%, ${g1}%, ${b1}%)`);
+    setText("c2txt", `C2 = (${r2}%, ${g2}%, ${b2}%)`);
+    setText("cmtxt", `C  = (${rm}%, ${gm}%, ${bm}%)`);
+
+    const dRG = Math.abs(rm-gm), dGB = Math.abs(gm-bm), dRB = Math.abs(rm-bm);
+    const isGray = (dRG <= tol && dGB <= tol && dRB <= tol);
+
+    const grayMsg = isGray
+      ? `Quasi-grigio ✅ (|R−G|=${dRG}%, |G−B|=${dGB}%, |R−B|=${dRB}%)`
+      : `Non grigio (|R−G|=${dRG}%, |G−B|=${dGB}%, |R−B|=${dRB}%)`;
+    document.getElementById("graytxt").textContent = grayMsg;
+  }
+
+  ids.forEach(id => el[id].addEventListener("input", update));
+  update();
+</script>
+</body>
+</html>
